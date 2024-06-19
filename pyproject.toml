@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "pact"
+version = "0.1.0"
+description = ""
+authors = ["Lawrence McAlpin <lmcalpin@gmail.com>"]
+readme = "README.md"
+packages = [{include = "pact", from = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+boto3 = "^1.34.101"
+asyncio = "^3.4.3"
+
+
+[tool.poetry.group.test.dependencies]
+pytest = "^8.2.0"
+
+
+[tool.poetry.group.dev.dependencies]
+mypy = "^1.10.0"
+coverage = "^7.5.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
