@@ -79,8 +79,6 @@ class ActorSystem(ActorRegistry):
         if f and not actor:
             actor = LambdaActor(f)
         name = kwargs.get('name')
-        print(f)
-        print(actor)
         assert actor is not None
         if not name:
             name = str(uuid.uuid4)
