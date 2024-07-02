@@ -29,7 +29,7 @@ class TestActors:
         with ActorSystem() as s:
             event = Event()
             fake_actor = FakeActor(event)
-            ref = s.register(fake_actor, name='fake')
+            ref = s.register(actor=fake_actor, name='fake')
             assert fake_actor._last_message is None
             ref.tell('hi')
             event.wait(1)
@@ -43,7 +43,7 @@ class TestActors:
 
         with ActorSystem() as s:
             echo_actor = EchoActor()
-            ref = s.register(echo_actor, name='echo')
+            ref = s.register(actor=echo_actor, name='echo')
             f = ref.ask('hi')
             assert 'hi' == f.result()
 

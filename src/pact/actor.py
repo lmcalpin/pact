@@ -6,7 +6,7 @@ from concurrent.futures import Future
 import uuid
 import threading
 import logging
-from typing import Any, Optional, override
+from typing import Any, Optional, Callable, override, overload
 
 LOGGER = logging.getLogger(__name__)
 
@@ -49,7 +49,14 @@ class Actor():
         self._busy = True
         self._started = False
         
+class LambdaActor(Actor):
+    def __init__(self, f: Callable[[Any], Any]):
+        super().__init__()
+        self.f = f
 
+    def on_message(self, message: Any):
+        return self.f(message)
+        
 class ActorSystem(ActorRegistry):
     def __init__(self, dispatcher : Optional[Dispatcher] = None):
         self.actor_refs : dict[str, ActorRef] = {}
@@ -58,7 +65,21 @@ class ActorSystem(ActorRegistry):
         self.thread = threading.Thread(target=self.__actor_processing_loop)
         self.thread.start()
     
-    def register(self, actor: Actor, name: str | None = None):
+    @overload
+    def register(self, actor: Actor, name: Optional[str] = None):
+        ...
+    
+    @overload
+    def register(self, f: Callable[[Any], Any], name: Optional[str] = None):
+        ...
+    
+    def register(self, **kwargs):
+        f = kwargs.get('f')
+        if f:
+            actor = LambdaActor(f)
+        actor = kwargs.get('actor')
+        name = kwargs.get('name')
+        assert actor is not None
         if not name:
             name = str(uuid.uuid4)
         if self.actor_refs.get(name):
