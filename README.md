@@ -12,11 +12,10 @@ used to address the messages they send to each other.
 # Usage
 
 ```python
-from pact import Actor, ActorSystem
+from pact import ActorSystem
 with ActorSystem() as s:
-    fake_actor = FakeActor(event)
-    ref = s.register(fake_actor, name='fake')
-    ref.tell('hi')
+    ref = s.register(f=lambda s: f'you said {s}', name='echo')
+    print(ref.ask('hi').result()) # 'You said hi
 ```
 
 # Notes
