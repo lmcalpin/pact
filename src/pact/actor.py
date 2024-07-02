@@ -1,39 +1,15 @@
+from pact._base import ActorRef, ActorRegistry
+from pact.messages import Envelope, Reply, Mailbox
+from pact.exceptions import *
+from pact.dispatchers import Dispatcher, InMemDispatcher
 from concurrent.futures import Future
-from pact._exceptions import *
-import queue
 import uuid
 import threading
 import logging
+from typing import Any, Optional, override
 
 LOGGER = logging.getLogger(__name__)
 
-class ActorRef():
-    def name(self) -> str:
-        raise NotImplementedError()
-
-    def tell(self, message):
-        raise NotImplementedError()
-
-    def ask(self, message) -> Future:
-        raise NotImplementedError()
-
-class Envelope():
-    """
-    An Envelope wraps a message with additional metadata.
-    """
-    def __init__(self, message, recipient_id: str, expects_reply: bool = False):
-        self.message_id = str(uuid.uuid4())
-        self.message = message
-        self.recipient_id = recipient_id
-        self.expects_reply = expects_reply
-        
-class Reply(Envelope):
-    """
-    A Reply wraps the response to the invocation of the ask method on an ActorRef with additional metadata.
-    """
-    def __init__(self, reply, reply_to_message_id: str):
-        super().__init__(reply, reply_to_message_id, expects_reply=False)
-        
 class Actor():
     """
     An actor is a computational model where the processing units (the actors) interact with
@@ -47,10 +23,10 @@ class Actor():
         self._busy = False
         self._mailbox = Mailbox()
         
-    def on_message(self, message: object):
+    def on_message(self, message: Any):
         raise NotImplementedError()
     
-    def _deliver_message(self, message):
+    def _deliver_message(self, message: Any):
         if not self._busy:
             try:
                 self._busy = True
@@ -74,26 +50,10 @@ class Actor():
         self._started = False
         
 
-class Mailbox():
-    def __init__(self):
-        self.inbox = queue.SimpleQueue()
-    
-    def deliver(self, message : Envelope):
-        return self.inbox.put(message)
-    
-    def take(self) -> object:
-        try:
-            return self.inbox.get(block=False)
-        except queue.Empty:
-            return None
-    
-    def has_mail(self):
-        return not self.inbox.empty()
-
-class ActorSystem():
-    def __init__(self):
-        self.actor_refs = {}
-        self.dispatcher = Dispatcher(self)
+class ActorSystem(ActorRegistry):
+    def __init__(self, dispatcher : Optional[Dispatcher] = None):
+        self.actor_refs : dict[str, ActorRef] = {}
+        self.dispatcher = dispatcher if dispatcher else InMemDispatcher(self)
         self.stopped = False
         self.thread = threading.Thread(target=self.__actor_processing_loop)
         self.thread.start()
@@ -142,60 +102,21 @@ class ActorSystem():
             
 class LocalActorRef(ActorRef):
     def __init__(self, actor_system: ActorSystem, name: str, actor: Actor):
-        self.actor_system = actor_system
+        self._actor_system = actor_system
         self._actor = actor
         self._name = name
-        
+    
+    @override
+    def name(self):
+        return self._name
+    
+    @override
     def tell(self, message : object):
         LOGGER.debug(f'Sending {message}')
         envelope = Envelope(message, self._name)
-        self.actor_system.dispatcher.tell(envelope)
+        self._actor_system.dispatcher.tell(envelope)
     
+    @override
     def ask(self, message : object) -> Future:
         envelope = Envelope(message, self._name, expects_reply=True)
-        return self.actor_system.dispatcher.ask(envelope)
-
-class Dispatcher():
-    def __init__(self, actor_system: ActorSystem):
-        self.messages_in_transit = queue.SimpleQueue[Envelope]()
-        self.awaiting_reply: dict[str, Future] = {}
-        self.actor_system = actor_system
-    
-    def tell(self, envelope: Envelope):
-        self.messages_in_transit.put(envelope)
-        LOGGER.debug(f'  -- sending {envelope.message_id} to {envelope.recipient_id} with {envelope.message}')
-        
-    def ask(self, envelope: Envelope):
-        self.tell(envelope)
-        future_reply = Future[object]()
-        self.awaiting_reply[envelope.message_id] = future_reply
-        LOGGER.debug(f'  -- sending {envelope.message_id} to {envelope.recipient_id} with {envelope.message} --- awaiting response')
-        return future_reply
-        
-    def _distribute_envelopes(self):
-        """
-        Takes messages from the Dispatcher's Queue and moves them into the Mailbox for the Actor
-        that is the intended recipient.
-        """
-        while True:
-            try:
-                LOGGER.debug('looking for more messages')
-                envelope = self.messages_in_transit.get(timeout=1)
-                LOGGER.debug(f' -- found {envelope}')
-                if envelope:
-                    # 
-                    if isinstance(envelope, Reply):
-                        future_reply = self.awaiting_reply[envelope.recipient_id]
-                        future_reply.set_result(envelope.message)
-                        print(future_reply)
-                        LOGGER.debug(f'  -- replied to {envelope.recipient_id} with {envelope.message}')
-                    else:
-                        actor_ref = self.actor_system.locate(envelope.recipient_id)
-                        if not actor_ref:
-                            raise InternalException()
-                        actor_ref._actor._mailbox.deliver(envelope)
-            except queue.Empty:
-                return
-            # when there are no more messages to read, return
-            if self.messages_in_transit.empty():
-                return
+        return self._actor_system.dispatcher.ask(envelope)

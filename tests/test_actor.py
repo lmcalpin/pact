@@ -1,7 +1,9 @@
-from pact import ActorSystem, Actor, InternalException
+from pact import ActorSystem, Actor
+from pact.exceptions import InternalException
 from threading import Event
 import pytest
 from unittest.mock import Mock, patch
+from typing import Optional
 
 class DummyActor(Actor):
     def on_message(self, message):
@@ -16,7 +18,7 @@ class TestActors:
         class FakeActor(Actor):
             def __init__(self, event: Event):
                 super().__init__()
-                self._last_message = None
+                self._last_message : Optional[str] = None
                 self.event = event
                 
             def on_message(self, msg: str):
