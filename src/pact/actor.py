@@ -75,10 +75,12 @@ class ActorSystem(ActorRegistry):
     
     def register(self, **kwargs):
         f = kwargs.get('f')
-        if f:
-            actor = LambdaActor(f)
         actor = kwargs.get('actor')
+        if f and not actor:
+            actor = LambdaActor(f)
         name = kwargs.get('name')
+        print(f)
+        print(actor)
         assert actor is not None
         if not name:
             name = str(uuid.uuid4)
@@ -114,12 +116,15 @@ class ActorSystem(ActorRegistry):
                 if envelope.expects_reply:
                     self.dispatcher.tell(Reply(reply, envelope.message_id))
     
+    def close(self):
+        self.stopped = True
+        self.thread.join()
+        
     def __enter__(self):
         return self
 
     def __exit__(self, type, value, traceback):
-        self.stopped = True
-        self.thread.join()
+        self.close()
             
 class LocalActorRef(ActorRef):
     def __init__(self, actor_system: ActorSystem, name: str, actor: Actor):

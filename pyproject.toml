@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pact"
-version = "0.1.0"
+version = "0.1.1"
 description = ""
 authors = ["Lawrence McAlpin <lmcalpin@gmail.com>"]
 readme = "README.md"
